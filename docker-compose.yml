@@ -1,0 +1,39 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: secret
+    healthcheck:
+      test: ["CMD", "mongosh", "--username", "root", "--password", "secret", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - mongo-data:/data/db
+
+  seed:
+    image: ruby:3.3.4
+    container_name: mongo-seed
+    depends_on:
+      mongo:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - .:/app:rw
+    environment:
+      MONGO_URI: mongodb://root:secret@mongo:27017/?authSource=admin
+    command: >
+      bash -lc "
+        gem install bundler &&
+        bundle config set without 'development test' 2>/dev/null || true &&
+        bundle install || gem install mongo &&
+        ruby scripts/seed_rates.rb
+      "
+    restart: "no"
+
+volumes:
+  mongo-data:
